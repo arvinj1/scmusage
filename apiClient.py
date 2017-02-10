@@ -30,6 +30,20 @@ uname=""
 password = ""
 dbname=""
 
+kioskCount = {}
+posterCount = {}
+kioskPosterMap = {}
+scKiosk={}
+appClickCount={}
+
+streetcarList=[]
+posterClickList=[]
+appIconList=[]
+translateList=[]
+mapclickList=[]
+
+
+
 
 def incJan ():
     global counterJan2017
@@ -59,6 +73,53 @@ def incJun ():
 
 def incNoop ():
     print (":Empty funcion")    
+
+def updateKioskStreetCar(kioskName):
+    global scKiosk
+
+    if not kioskName in scKiosk:
+            scKiosk[kioskName]=1
+    else:
+        scKiosk[kioskName] += 1
+
+def updateAppClick(kioskName):
+    global appClickCount
+
+    
+    
+    if not kioskName in appClickCount:
+        appClickCount[kioskName]=1
+    else:
+        appClickCount[kioskName] += 1
+
+
+            
+
+def updateIndividualCount(kioskName,posterName):
+    global kioskCount
+    global posterCount
+    global kioskPosterMap
+
+    if not kioskName in kioskCount:
+        kioskCount[kioskName]=1
+    else:
+        kioskCount[kioskName] += 1
+
+    if not posterName in posterCount:
+        posterCount[posterName]=1
+    else:
+        posterCount[posterName] += 1
+
+    newname = str(kioskName)+"#"+str(posterName)    
+    if not newname in kioskPosterMap:
+        kioskPosterMap[newname]=1
+    else:
+        kioskPosterMap[newname] += 1    
+    
+            
+
+    
+
         
 counterManager = {
     "2017-01" : incJan,
@@ -86,7 +147,7 @@ def loadConfig ():
 def connect (qtype):
    
     
-    client=InfluxDBClient(URL,PORT,uname,password,store)
+    client=InfluxDBClient(URL,PORT,uname,password,dbname)
     if (client == None):
         print ("Error connecting to URL");
         return;
@@ -157,7 +218,21 @@ def formatOutput ():
                         for click in clicks:
                             if "Bangalore" in click or "bangalore" in click:
                                 offset = offset +1
-                                #print (click)
+                                #if clickBait == "clicked":
+                                   #print (click[3] + " is the kiosk and " + "poster is ",click[5])
+                                   # exit
+
+                            if clickBait == "clicked":
+                                updateIndividualCount(click[3],click[5])
+
+                            if clickBait == "streetcarClick":
+                                updateKioskStreetCar(click[3])    
+
+                            if clickBait == "appIconClick":
+                                #print ("AppClickData")
+                                #print (click[4])
+                                updateAppClick(click[4])   
+                                #exit     
 
                             keys = counterManager.keys()
                             for key in keys:
@@ -178,6 +253,97 @@ def formatOutput ():
         print ("Total Clicks in August ", counterAug) 
         print ("Total Clicks in July ", counterJuly) 
         print ("Total Clicks in June ", counterJune)   
+
+        
+
+        import pygal
+        import calendar
+
+        bar_chart=pygal.Bar()
+        bar_chart.add(clickBait,[counterJune,counterJuly,counterAug,counterSept,counterOct,counterNov,counterDec])
+        filename=clickBait+".svg"
+        bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017"]
+        bar_chart.render_to_file(filename)
+
+        import operator
+         
+        if clickBait == "appIconClick":
+            print ("Top Icons Clicked")
+            sortedKiosk=sorted( scKiosk.items(),key=operator.itemgetter(1))
+            sortedKiosk.reverse()
+
+            print (len(sortedKiosk))
+            pie_chart = pygal.Pie()
+            pie_chart.title = "Top 5 AppIcon Clicks"
+            for x in range(5):
+                 pie_chart.add(sortedKiosk[x][0],sortedKiosk[x][1])
+
+            pie_chart.render_to_file ("appicontop.svg")     
+            
+            
+
+            
+        if clickBait == "streetcarClick":
+            print ("Kiosk based StreetCar Clicks")
+            sortedKiosk=sorted( scKiosk.items(),key=operator.itemgetter(1))
+            sortedKiosk.reverse()
+
+            pie_chart = pygal.Pie()
+            pie_chart.title = "Top 5 StreetCar Clicks"
+            for x in range(5):
+                 pie_chart.add(sortedKiosk[x][0],sortedKiosk[x][1])
+
+            pie_chart.render_to_file ("streetcartop.svg")  
+            
+        if clickBait == "clicked":
+            print ("The individual stats")
+            
+
+            global kioskCount
+            global posterCount
+            global kioskPosterMap
+
+            sortedKiosk=sorted(kioskCount.items(),key=operator.itemgetter(1))
+            sortedKiosk.reverse()
+
+            sortedPoster=sorted(posterCount.items(),key=operator.itemgetter(1))
+            sortedPoster.reverse()
+        
+            sortedKioskPosterMap=sorted(kioskPosterMap.items(),key=operator.itemgetter(1))
+            sortedKioskPosterMap.reverse()
+        
+            # top 5 
+            pie_chart = pygal.Pie()
+            pie_chart.title = "Top 5 Kiosk Clicks"
+            for x in range(5):
+                pie_chart.add(sortedKiosk[x][0],sortedKiosk[x][1])
+
+            pie_chart.render_to_file ("topkiosk.svg")      
+        
+            #print (len(sortedKiosk))
+           # for x in range(5):
+           #     print (sortedKiosk[x])
+
+         #   print ("Lowest ones ")
+
+          #  for x in reversed(range(50)):
+           #     print (sortedKiosk[len(sortedKiosk)-x-1])    
+            
+            #print ("Poster Stats ")
+            pie_chart = pygal.Pie()
+            pie_chart.title = "Top 5 Poster Clicks"
+            for x in range(5):
+                 pie_chart.add(sortedKiosk[x][0],sortedKiosk[x][1])
+
+            pie_chart.render_to_file ("topposter.svg") 
+            #print (len(sortedPoster))
+            #for x in range(5):
+             #   print (sortedPoster[x])
+            #print ("Mapping Stats ")    
+            #print (len(sortedKioskPosterMap))
+            #for x in range(5):
+            #    print (sortedKioskPosterMap[x])
+             
 
  
 
