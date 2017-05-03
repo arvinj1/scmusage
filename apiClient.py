@@ -8,11 +8,11 @@ import json
 from pprint import pprint
 
 clickBaits = [
-    "streetcarClick",
-    "translate",
-    "mapClick",
-    "appIconClick",
-    "clicked"
+  "streetcarClick",
+  "translate",
+   "mapClick",
+    "appIconClick"
+    ,"clicked"
 ]
  
 counterDec=0
@@ -23,18 +23,24 @@ counterAug=0
 counterJuly=0
 counterJune=0  
 counterJan2017=0
+counterFeb2017=0
+counterMarch=0
+
           
 URL=""
 PORT=0
 uname=""
 password = ""
 dbname=""
+totalSelfieClicks=0
 
 kioskCount = {}
 posterCount = {}
 kioskPosterMap = {}
 scKiosk={}
 appClickCount={}
+selfieKiosks={}
+appNames={}
 
 streetcarList=[]
 posterClickList=[]
@@ -44,10 +50,17 @@ mapclickList=[]
 
 
 
-
 def incJan ():
     global counterJan2017
     counterJan2017 =counterJan2017+1
+
+def incFeb ():
+    global counterFeb2017
+    counterFeb2017 =counterFeb2017+1    
+
+def incMar ():
+    global counterMar2017
+    counterMar2017 =counterMar2017+1
 
 def incDec ():
     global counterDec
@@ -74,6 +87,16 @@ def incJun ():
 def incNoop ():
     print (":Empty funcion")    
 
+def updateKioskSelfie (kioskName):
+    global selfieKiosks
+    global totalSelfieClicks
+
+    totalSelfieClicks=totalSelfieClicks+1
+    if not kioskName in selfieKiosks:
+        selfieKiosks[kioskName]=1
+    else:
+        selfieKiosks[kioskName] += 1
+
 def updateKioskStreetCar(kioskName):
     global scKiosk
 
@@ -82,15 +105,25 @@ def updateKioskStreetCar(kioskName):
     else:
         scKiosk[kioskName] += 1
 
-def updateAppClick(kioskName):
+def updateAppClick(appName,kioskName):
     global appClickCount
+    global appNames
 
-    
-    
+    print("Updating App ", appName, " For ", kioskName)
+
     if not kioskName in appClickCount:
         appClickCount[kioskName]=1
     else:
         appClickCount[kioskName] += 1
+
+   
+    if not appName in appNames:
+        appNames[appName]=1
+    else:
+        appNames[appName] += 1    
+
+
+         
 
 
             
@@ -122,6 +155,8 @@ def updateIndividualCount(kioskName,posterName):
 
         
 counterManager = {
+    "2017-03" : incMar,
+    "2017-02" : incFeb,
     "2017-01" : incJan,
     "2016-12" : incDec,
     "2016-11" : incNov,
@@ -142,7 +177,48 @@ def loadConfig ():
         password=data['creds']['pwd']
         dbname = data['mongodb']['db']
 
+def getSelfieClicks():
+    print ("GEtting Selfies")
+    client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    if (client == None):
+        print ("Error connecting to URL");
+        return;
+    query="select * FROM appIconClick WHERE appName='selfie' AND city='kc'"
+    filename="selfie.json"
+    result=client.query(query)
+    with open (filename,'w') as f:
+        json.dump(result.raw,f)
+
+    print ("Calling the items ")
+    items = result.items()
+    print (items)
+
+    print ("Calling the keys ")
+    keys = result.keys()
+    print (keys)
+
+def getSelfieFromFile():
+    print ("Getting selfie clicks from file")
+    with open ("./selfie.json","r") as f:
+         data=json.load(f)
+
+    keys=data.keys()
+    for key in keys:        
+        value=data[key]
+        lent=list(value[0])
+        for lentee in lent:
+            if lentee == "values":
+                clicks= (data[key][0][lentee])
+                print("Clicks:",clicks) 
+                for click in clicks:
+                    if "Bangalore" in click or "bangalore" in click:
+                        print ("There is banglore kciosk selfie")
+                    updateKioskSelfie(click[4])    
+                            
+
+
   
+    
     
 def connect (qtype):
    
@@ -188,10 +264,52 @@ def clearCounters ():
         counterJune=0  
         global counterJan2017 
         counterJan2017=0
+        global counterFeb2017 
+        counterFeb2017=0
+        global counterMar2017 
+        counterMar2017=0
+
            
-           
+def printSelfieCharts():
+    import pygal
+    import operator
+        
+    print ("Selfie Clicked")
+    sortedKiosk=sorted( selfieKiosks.items(),key=operator.itemgetter(1))
+    sortedKiosk.reverse()
+
+    import time
+## dd/mm/yyyy format
+    today= (time.strftime("%d/%m/%Y"))
+
+    print (len(sortedKiosk))
+    pie_chart = pygal.HorizontalBar()
+
+    pie_chart.title = "Kiosks With Selfies Total["+str(totalSelfieClicks)+"]  "+str(today)
+    total = 0
+    for x in range(len(sortedKiosk)):
+        pie_chart.add(sortedKiosk[x][0],sortedKiosk[x][1])
+        print(sortedKiosk[x][0],":",sortedKiosk[x][1])
+        total += sortedKiosk[x][1]
+
+    print("*"*60)
+    print("Total selfies taken is ", total)    
+    pie_chart.render_to_file ("selfies.svg")                
     
-def formatOutput ():
+def currentMonthReport ():
+    import time
+## dd/mm/yyyy format
+    today= (time.strftime("%m"))
+    lastMonth=int(today)-1
+    for click in clickBaits:
+        
+        
+def formatOutput (report=True,selfieOnly=False):
+  
+    if selfieOnly == True:
+        printSelfieCharts()
+        return
+
     
     for clickBait in clickBaits:
         clearCounters()
@@ -214,13 +332,12 @@ def formatOutput ():
                     if lentee == "values":
                        
                         clicks= (data[key][0][lentee])
+                        # offset are any data not to be considered
                         offset = 0
                         for click in clicks:
                             if "Bangalore" in click or "bangalore" in click:
                                 offset = offset +1
-                                #if clickBait == "clicked":
-                                   #print (click[3] + " is the kiosk and " + "poster is ",click[5])
-                                   # exit
+                              
 
                             if clickBait == "clicked":
                                 updateIndividualCount(click[3],click[5])
@@ -229,11 +346,9 @@ def formatOutput ():
                                 updateKioskStreetCar(click[3])    
 
                             if clickBait == "appIconClick":
-                                #print ("AppClickData")
-                                #print (click[4])
-                                updateAppClick(click[4])   
-                                #exit     
-
+                                
+                                updateAppClick(click[1],click[4])   
+                              
                             keys = counterManager.keys()
                             for key in keys:
                                 if any (key in str(c) for c in click):
@@ -243,8 +358,10 @@ def formatOutput ():
         print ("*" * 40 )   
         print ("Stats for ", clickBait )                      
         print ("Clicks is=",len(clicks), "offsetted=",offset,
-        counterJan2017+counterDec+counterNov+counterOct+counterSept+counterAug+counterJuly+counterJune)  
-        print ("*" * 40  )                      
+        counterMar2017+counterFeb2017+counterJan2017+counterDec+counterNov+counterOct+counterSept+counterAug+counterJuly+counterJune)  
+        print ("*" * 40  )   
+        print ("Total Clicks in Mar 2017 ", counterMar2017)
+        print ("Total Clicks in Feb 2017 ", counterFeb2017)                   
         print ("Total Clicks in Jan 2017 ", counterJan2017) 
         print ("Total Clicks in Dec ", counterDec) 
         print ("Total Clicks in Nov ", counterNov) 
@@ -260,16 +377,16 @@ def formatOutput ():
         import calendar
 
         bar_chart=pygal.Bar()
-        bar_chart.add(clickBait,[counterJune,counterJuly,counterAug,counterSept,counterOct,counterNov,counterDec])
+        bar_chart.add(clickBait,[counterJune,counterJuly,counterAug,counterSept,counterOct,counterNov,counterDec,counterJan2017,counterFeb2017,counterMar2017])
         filename=clickBait+".svg"
-        bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017"]
+        bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017","Feb2017","Mar2017"]
         bar_chart.render_to_file(filename)
 
         import operator
          
         if clickBait == "appIconClick":
             print ("Top Icons Clicked")
-            sortedKiosk=sorted( scKiosk.items(),key=operator.itemgetter(1))
+            sortedKiosk=sorted( appNames.items(),key=operator.itemgetter(1))
             sortedKiosk.reverse()
 
             print (len(sortedKiosk))
@@ -320,30 +437,15 @@ def formatOutput ():
 
             pie_chart.render_to_file ("topkiosk.svg")      
         
-            #print (len(sortedKiosk))
-           # for x in range(5):
-           #     print (sortedKiosk[x])
-
-         #   print ("Lowest ones ")
-
-          #  for x in reversed(range(50)):
-           #     print (sortedKiosk[len(sortedKiosk)-x-1])    
-            
-            #print ("Poster Stats ")
+          
             pie_chart = pygal.Pie()
             pie_chart.title = "Top 5 Poster Clicks"
             for x in range(5):
-                 pie_chart.add(sortedKiosk[x][0],sortedKiosk[x][1])
+                 pie_chart.add(sortedPoster[x][0],sortedPoster[x][1])
 
             pie_chart.render_to_file ("topposter.svg") 
-            #print (len(sortedPoster))
-            #for x in range(5):
-             #   print (sortedPoster[x])
-            #print ("Mapping Stats ")    
-            #print (len(sortedKioskPosterMap))
-            #for x in range(5):
-            #    print (sortedKioskPosterMap[x])
-             
+       
+         
 
  
 
@@ -355,29 +457,41 @@ def run(arg):
         formatOutput()
 
     if arg == "output":
-        formatOutput()
+        formatOutput();
+
+    if arg == "report":
+        formatOutput(report=True);    
 
     if arg == "connect":
         connect(True)
     if arg == "configTest":
         loadConfig()   
+
+    if arg == "selfieClick":  
+        loadConfig()
+        getSelfieClicks()
+        getSelfieFromFile()  
+        printSelfieCharts()
+
+    if arg == "loadSelfieData":
+        getSelfieFromFile()   
+        printSelfieCharts() 
        
-        
-    
-
-def main(args):
-    if len(args) == 0:
-        print ("No args passed");
-        run("output")
-
-        
-    else:
-        print ("Arguments passed");
-        for arg in args:
-            run(arg)
-            
     
 if __name__ == '__main__':
     import sys;
-    main(sys.argv[1:])
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('-m',
+                        "--mode",
+                        dest="mode",
+                        action="store")
+    args=parser.parse_args()                    
+        
+    if args.mode:
+        print ("Arguments passed");
+        run(args.mode)
+    else:
+        run ("output")   
+   
    
