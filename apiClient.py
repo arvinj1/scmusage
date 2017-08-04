@@ -25,6 +25,7 @@ clickBaits = [
     ,"disability"
     ,"transit"
     ,"streetcarClick"
+    ,"adCardClick"
 ]
 captions = [
     "Translation Pressed"
@@ -48,6 +49,8 @@ counterMar2017=0
 counterApr2017=0
 counterMay=0
 counterJune2017=0
+counterJuly2017=0
+
 
           
 URL=""
@@ -67,9 +70,13 @@ appClickCount={}
 selfieKiosks={}
 smsKiosks={}
 appNames={}
+adCardCount={}
 
 wayFindingKiosks={}
 wayFTime={}
+
+'''ad card releated info '''
+adCardKioks={}
 
 streetcarList=[]
 posterClickList=[]
@@ -81,7 +88,8 @@ wayFindingList=[]
 
 ''' Kiosk mapping '''
 kioskMap = {
-    "Union Station SB-North Face":"Union Station",
+"Union Station SB-North Face":   "Union Station",
+"Union Station SB -North Face":  "Union Station",
 "Union Station SB -South Face" : "Union Station",
 "Power Light - 14th Main - SB West Face" : "P&L",
 "Power Light - 14th Main - NB West Face" :"P&L",
@@ -113,11 +121,13 @@ kioskMap = {
 "20thgrand":"20th&Grand",
 "Crossroads - 19th Main - SB North Face":"Crossroads",
 "Barney Allis -12th Wyandotte - South Face":"Barney",
+"barneyallissouth":"Barney",
 "Crown Center - 2470 Grand - East Face":"Crown",
 "City Hall -12th Oak":"City Hall",
 "barneysouth":"Barney",
 "Convention Center - 301 W 13th":"Convention",
 "Performing Arts Center":"PerformingArts",
+"performingartscenter" : "PerformingArts",
 "Oppenstein":"Oppenstein",
 "Power Light 14th Main -NB East Face":"P&L",
 "Zotac":"Zotac",
@@ -156,7 +166,11 @@ def incMay17 ():
 
 def incJune17 ():
     global counterJune2017
-    counterJune2017 =counterJune2017+1      
+    counterJune2017 =counterJune2017+1     
+
+def incJuly17 ():
+    global counterJuly2017
+    counterJuly2017 =counterJuly2017+1          
       
 
 def incDec ():
@@ -240,7 +254,38 @@ def updateAppClick(appNameMash,kioskName):
         appNames[appName] += 1    
 
 def updateTransit(click):
-    print(click)
+    #Sprint(click)
+    pass
+
+adMistakes=0
+adClicks=0
+
+def updateAdCount(click):
+    global adMistakes
+    global kioskMap
+    location = click[4]
+    try:
+        kioskName=kioskMap[location]
+    except KeyError:
+        print ("Could not find ",location)
+        adMistakes+=1
+        return    
+
+    if kioskName == "":
+        adMistakes+=1
+        return
+
+    global adCardKioks
+    
+    if not kioskName in adCardKioks:
+        adCardKioks[kioskName]=1
+    else:
+        adCardKioks[kioskName]+=1
+
+    global adClicks
+    adClicks+=1   
+            
+
 
 def updateWayfindingKiosks (click):
     global wayFindingKiosks  
@@ -294,6 +339,7 @@ def updateIndividualCount(kioskNameMash,posterName):
  
         
 counterManager = {
+    "2017-07" : incJuly17,
     "2017-06" : incJune17,
     "2017-05" : incMay17,
     "2017-04" : incApr,
@@ -465,6 +511,12 @@ def clearCounters ():
         global counterMay2017
         counterMay2017=0
 
+        global counterJune2017
+        counterJune2017=0
+
+        global counterJuly2017
+        counterJuly2017=0
+
            
 def printSelfieCharts():
     import pygal
@@ -581,6 +633,10 @@ def currentMonthReport ():
 
                             if clickBait == "appIconClick":    
                                 updateAppClick(click[1],click[4])   
+
+                            if clickBait == "adCardClick":
+                                updateAdCount(click)
+
 
                             if clickBait == "transit":  
                                 print ("updating transit as streetcar")
@@ -743,6 +799,7 @@ def formatOutput (report=True,selfieOnly=False):
         printSelfieCharts()
         return
 
+    global totalInteraction
     totalInteraction=0
     for clickBait in clickBaits:
         if clickBait != "streetcarClick":
@@ -769,8 +826,7 @@ def formatOutput (report=True,selfieOnly=False):
                         for click in clicks:
                             if "Bangalore" in click or "bangalore" in click:
                                 offset = offset +1
-                            else:
-                                global totalInteraction            
+                            else:          
                                 totalInteraction+=1             
                               
 
@@ -786,6 +842,10 @@ def formatOutput (report=True,selfieOnly=False):
 
                             if clickBait == "appIconClick":    
                                 updateAppClick(click[1],click[4])   
+
+                              
+                            if clickBait == "adCardClick":
+                                updateAdCount(click)    
 
                             if clickBait == "wayfinding":    
                                 updateWayfindingKiosks(click)
@@ -811,9 +871,11 @@ def formatOutput (report=True,selfieOnly=False):
                         
         print ("*" * 40 )   
         print ("Stats for ", clickBait )                      
-        print ("Clicks is=",len(clicks), "offsetted=",offset,counterMay2017+ counterApr2017+counterMar2017+counterFeb2017+counterJan2017+counterDec+counterNov+counterOct+counterSept+counterAug+counterJuly+counterJune)  
+        print ("Clicks is=",len(clicks), "offsetted=",offset,counterJuly2017+counterJune2017+counterMay2017+ counterApr2017+counterMar2017+counterFeb2017+counterJan2017+counterDec+counterNov+counterOct+counterSept+counterAug+counterJuly+counterJune)  
         print ("*" * 40  )   
-        print ("Total Clicks in Apr 2017 ", counterMay2017)
+        print ("Total Clicks in June 2017 ", counterJuly2017)
+        print ("Total Clicks in June 2017 ", counterJune2017)
+        print ("Total Clicks in May 2017 ", counterMay2017)
         print ("Total Clicks in Apr 2017 ", counterApr2017)
         print ("Total Clicks in Mar 2017 ", counterMar2017)
         print ("Total Clicks in Feb 2017 ", counterFeb2017)                   
@@ -839,12 +901,12 @@ def formatOutput (report=True,selfieOnly=False):
         if clickBait=="transit":
            pass
 
-        bar_chart.add(clickBait,[counterJune,counterJuly,counterAug,counterSept,counterOct,counterNov,counterDec,counterJan2017,counterFeb2017, counterMar2017, counterApr2017,counterMay2017])
+        bar_chart.add(clickBait,[counterJune,counterJuly,counterAug,counterSept,counterOct,counterNov,counterDec,counterJan2017,counterFeb2017, counterMar2017, counterApr2017,counterMay2017,counterJune2017, counterJuly2017])
        
 
         filename=clickBait+".svg"
         sfilename=clickBait+".png"
-        bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017","Feb2017","Mar2017","April 2017","May2017"]
+        bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017","Feb2017","Mar2017","April 2017","May2017","June'17","July'17"]
         bar_chart.render_to_png(sfilename)
 
 
@@ -853,7 +915,22 @@ def formatOutput (report=True,selfieOnly=False):
         xaxis=[]
         yaxis=[]
         pie_chart = pygal.Bar(print_values=True, print_values_position='top')
-         
+
+        if clickBait == "adCardClick":
+            print ("Top ad locations")
+            sortedKiosk=sorted( adCardKioks.items(),key=operator.itemgetter(1))
+            sortedKiosk.reverse()
+            print (len(sortedKiosk))
+            for x in range(len(sortedKiosk)):
+                print (sortedKiosk[x][0],sortedKiosk[x][1] )
+                xaxis.append(sortedKiosk[x][0])
+                yaxis.append(sortedKiosk[x][1])
+                 
+            pie_chart.x_labels=xaxis
+            pie_chart.add(clickBait,yaxis)
+
+            pie_chart.render_to_png ("adTopKiosks.png")     
+
         if clickBait == "appIconClick":
             print ("Top Icons Clicked")
             sortedKiosk=sorted( appNames.items(),key=operator.itemgetter(1))
@@ -947,7 +1024,10 @@ def formatOutput (report=True,selfieOnly=False):
     print("Total Interactions="+str(totalInteraction))
     print ("Total StreetCar", totalStreetCar)
     print("Total Wayfinding", totalWayfinding)
-    print("Total Multi", totalMulti)        
+    print("Total Multi", totalMulti)   
+
+    print("Total mistakes", adMistakes)   
+    print("Total ad clicks", adClicks)        
     
         
 
@@ -964,6 +1044,11 @@ def run(arg):
 
     if arg == "report":
         fullReport()     
+
+    if arg == "adonly":
+        global clickBaits
+        clickBaits=["adCardClick"]
+        formatOutput()
 
     if arg == "connect":
         connect(False)
