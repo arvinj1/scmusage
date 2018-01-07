@@ -63,6 +63,7 @@ counterAugust2017=0
 counterSept2017=0
 counterOct2017=0
 counterNov2017=0
+counterDec2017=0
 
 globalStats={}
 
@@ -205,9 +206,12 @@ def incOct17 ():
       
 def incNov17 ():
     global counterNov2017
-    counterNov2017=counterNov2017+1                  
-      
+    counterNov2017=counterNov2017+1  
 
+def incDec17():
+    global counterDec2017
+    counterDec2017=counterDec2017+1                    
+      
 
 def incDec ():
     global counterDec
@@ -503,7 +507,7 @@ def getSMSRequestsFromFile():
                     else:
                         updateKioskSMS(click[3])        
     
-def connect (currentMonth):
+def connect (currentMonth,onlyToday=False):
    
     client=InfluxDBClient(URL,PORT,uname,password,dbname)
     if (client == None):
@@ -518,13 +522,22 @@ def connect (currentMonth):
         pass
         #print (int(time.strftime("%d"))," is the date no addings")  
 
-    lastMonth=int(today)-1
 
     year = time.strftime("%Y")
+    endyear=year
+    lastMonth=int(today)-1
+    print (lastMonth)
+    if lastMonth == 0:
+        lastMonth=12
+        yearint=int(year)-1
+        print (yearint)
+        year='0{0}'.format(yearint)[-4:]
+        print (year)
+
     strformat='0{0}'.format(lastMonth)[-2:]
     startDay=year+"-"+strformat+"-01"
     strformat='0{0}'.format(today)[-2:]
-    endDay=year+"-"+strformat+"-01"    
+    endDay=endyear+"-"+strformat+"-01"    
 
     print (startDay,"to " , endDay)
     
@@ -538,6 +551,7 @@ def connect (currentMonth):
             query="select * from " + click
             filename=click+".json"
         
+        print (query)
         
         result=client.query(query)
         
@@ -592,6 +606,9 @@ def clearCounters ():
 
         global counterNov2017
         counterNov2017=0
+
+        global counterDec2017
+        counterDec2017=0
 
            
 def printSelfieCharts(textOnly=False):
@@ -822,12 +839,13 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                         
                                 
         print (40*"-")                        
-        print (captions[i]," : ", counterNov2017)
+        print (captions[i]," : ", counterDec2017)
         i=i+1
         #print(captions[])
-        globalStats[clickBait]=counterNov2017
+        globalStats[clickBait]=counterDec2017
         
         if currentMonth==False:
+            print ("Total Clicks in Dec 2017 ", counterDec2017)
             print ("Total Clicks in Nov 2017 ", counterNov2017)
             print ("Total Clicks in Sept 2017 ", counterSept2017)
             print ("Total Clicks in August 2017 ", counterAugust2017)
@@ -999,7 +1017,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
     sortedKiosk=sorted(sortedKiosk.items(), key=operator.itemgetter(1))
     sortedKiosk.reverse()
 
-    for x in range(5):
+    for x in range(len(sortedKiosk)):
         print (sortedKiosk[x][0],":",sortedKiosk[x][1])
         
     print("Total Interactions="+str(totalInteraction))
@@ -1031,7 +1049,7 @@ def run(arg):
         clickBaits=["streetcarClick","transit"]
         loadConfig()
         connect(False)
-        formatOutput(textOnly=True)
+        formatOutput(currentMonth=True,textOnly=True)
 
     if arg == "clicked":
         
@@ -1084,6 +1102,13 @@ def run(arg):
         loadConfig()
         connect(currentMonth=True)
         formatOutput(currentMonth=True,textOnly=True)
+
+    if arg == "today":
+        loadConfig()
+        connect(today=True)
+        formatOutput(onlyToday=True,textOnly=True)
+
+            
 
     if arg == "currentMonthFromData":
         loadCurrentFromData()
