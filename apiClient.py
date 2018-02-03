@@ -64,6 +64,7 @@ counterSept2017=0
 counterOct2017=0
 counterNov2017=0
 counterDec2017=0
+counterJan2018=0
 
 globalStats={}
 
@@ -158,6 +159,10 @@ kioskMap = {
 "dallas":"dallas",
 }
 
+kioskWrongData= [
+    "Kcatademo","BlueLine","TRAILS","Bangalore","demo"
+]
+
 # core APPS
 totalStreetCar=0
 totalStreetCar2=0
@@ -210,7 +215,11 @@ def incNov17 ():
 
 def incDec17():
     global counterDec2017
-    counterDec2017=counterDec2017+1                    
+    counterDec2017=counterDec2017+1        
+
+def incJan18():
+    global counterJan2018
+    counterJan2018=counterJan2018+1                        
       
 
 def incDec ():
@@ -402,6 +411,8 @@ def updateIndividualCount(kioskNameMash,posterName):
  
         
 counterManager = {
+    "2018-01" : incJan18,
+    "2017-12" : incJan18,
     "2017-11" : incNov17,
     "2017-10" : incOct17,
     "2017-09" : incSep17,
@@ -545,7 +556,7 @@ def connect (currentMonth,onlyToday=False):
     for click in clickBaits:
         
         if currentMonth == True:
-            query="select * from " + click + " where time > '" +startDay + "' and time < '" + endDay + "'"
+            query="select * from " + click + " where time >= '" +startDay + "' and time < '" + endDay + "'"
             filename=click+"_currentMonth.json"
         else:
             query="select * from " + click
@@ -609,6 +620,9 @@ def clearCounters ():
 
         global counterDec2017
         counterDec2017=0
+
+        global counterJan2018
+        counterJan2018=0
 
            
 def printSelfieCharts(textOnly=False):
@@ -793,11 +807,11 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                     print ("Not of this month",strformat)
                                     continue
                                     
-                            if "Bangalore" in click or "bangalore" in click:
+                            if any (c.lower() in str(clickpart).lower() for clickpart in click for c in kioskWrongData):
                                 offset = offset +1
-                            else: 
-                                       
-                                totalInteraction = totalInteraction + 1           
+                                continue
+                            
+                            totalInteraction = totalInteraction + 1           
                               
 
                             if clickBait == "clicked":
@@ -839,12 +853,13 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                         
                                 
         print (40*"-")                        
-        print (captions[i]," : ", counterDec2017)
+        print (captions[i]," : ", counterJan2018)
         i=i+1
-        #print(captions[])
-        globalStats[clickBait]=counterDec2017
+        #print(captions[i])
+        globalStats[clickBait]=counterJan2018
         
         if currentMonth==False:
+            print ("Total Clicks in Dec 2017 ", counterJan2018)
             print ("Total Clicks in Dec 2017 ", counterDec2017)
             print ("Total Clicks in Nov 2017 ", counterNov2017)
             print ("Total Clicks in Sept 2017 ", counterSept2017)
