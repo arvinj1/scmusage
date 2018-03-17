@@ -65,6 +65,7 @@ counterOct2017=0
 counterNov2017=0
 counterDec2017=0
 counterJan2018=0
+counterFeb2018=0
 
 globalStats={}
 
@@ -219,7 +220,11 @@ def incDec17():
 
 def incJan18():
     global counterJan2018
-    counterJan2018=counterJan2018+1                        
+    counterJan2018=counterJan2018+1  
+
+def incFeb18():
+    global counterFeb2018
+    counterFeb2018=counterFeb2018+1                          
       
 
 def incDec ():
@@ -339,7 +344,7 @@ def updateAdCount(click):
     try:
         kioskName=kioskMap[location]
     except KeyError:
-        #print ("Could not find ",location)
+        print ("Could not find ",location)
         adMistakes+=1
         return    
 
@@ -411,8 +416,9 @@ def updateIndividualCount(kioskNameMash,posterName):
  
         
 counterManager = {
+    "2018-02" : incFeb18,
     "2018-01" : incJan18,
-    "2017-12" : incJan18,
+    "2017-12" : incDec17,
     "2017-11" : incNov17,
     "2017-10" : incOct17,
     "2017-09" : incSep17,
@@ -470,11 +476,12 @@ def getSelfieFromFile():
         for lentee in lent:
             if lentee == "values":
                 clicks= (data[key][0][lentee])
-                #print("Clicks:",clicks) 
+                print("Clicks:",clicks) 
                 for click in clicks:
                     if "Bangalore" in click or "bangalore" in click:
                         print ("There is banglore kciosk selfie")
-                    updateKioskSelfie(click[4])    
+                    else:    
+                        updateKioskSelfie(click[4])    
                             
 
 
@@ -623,6 +630,9 @@ def clearCounters ():
 
         global counterJan2018
         counterJan2018=0
+        
+        global counterFeb2018 
+        counterFeb2018=0
 
            
 def printSelfieCharts(textOnly=False):
@@ -771,8 +781,6 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
 
     global totalInteraction
     totalInteraction=0
-
-    
        
     i=0    
     for clickBait in clickBaits:
@@ -811,8 +819,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                 offset = offset +1
                                 continue
                             
-                            totalInteraction = totalInteraction + 1           
-                              
+                            totalInteraction = totalInteraction + 1          
 
                             if clickBait == "clicked":
                                 updateIndividualCount(click[3],click[5])
@@ -848,18 +855,18 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                     counterManager.get(key,incNoop) ()
                                     break;  
 
-                            if "bangalore" or "Bangalore" in click:
-                                pass;
+                            
                                         
                                 
         print (40*"-")                        
-        print (captions[i]," : ", counterJan2018)
+        print (captions[i]," : ", counterFeb2018)
         i=i+1
         #print(captions[i])
-        globalStats[clickBait]=counterJan2018
+        globalStats[clickBait]=counterFeb2018
         
         if currentMonth==False:
-            print ("Total Clicks in Dec 2017 ", counterJan2018)
+            print ("Total Clicks in Feb 2018 ", counterFeb2018)
+            print ("Total Clicks in Jan 2017 ", counterJan2018)
             print ("Total Clicks in Dec 2017 ", counterDec2017)
             print ("Total Clicks in Nov 2017 ", counterNov2017)
             print ("Total Clicks in Sept 2017 ", counterSept2017)
@@ -1074,9 +1081,11 @@ def run(arg):
         formatOutput()    
 
     if arg == "adonly":
-       
         clickBaits=["adCardClick"]
-        formatOutput()
+        loadConfig()
+        connect(False)
+        
+        formatOutput(textOnly=True)
 
     if arg == "currentMonthAd":
        
@@ -1125,11 +1134,15 @@ def run(arg):
 
             
 
-    if arg == "currentMonthFromData":
-        loadCurrentFromData()
+    if arg == "currentFromFile":
+        formatOutput(currentMonth=True, textOnly=True)
         
             
-       
+    if arg == "armyData":
+        loadConfig()
+        connect(currentMonth=False)
+
+
     
 if __name__ == '__main__':
     import sys;
