@@ -2,6 +2,7 @@
 import json
 import os
 import time
+import datetime
 from pprint import pprint
 
 import iso8601
@@ -66,9 +67,12 @@ counterNov2017=0
 counterDec2017=0
 counterJan2018=0
 counterFeb2018=0
+counterMarch2018=0
+counterApril2018=0
 
 globalStats={}
-
+city="kc"
+fordate=None
 
           
 URL=""
@@ -104,7 +108,6 @@ translateList=[]
 mapclickList=[]
 wayFindingList=[]
 
-city="kc"
 
 
 ''' Kiosk mapping '''
@@ -161,7 +164,7 @@ kioskMap = {
 }
 
 kioskWrongData= [
-    "Kcatademo","BlueLine","TRAILS","Bangalore","demo"
+    "Kcatademo","BlueLine","TRAILS","Bangalore","demo","duke1","nanov2","nanov1","duke22057"
 ]
 
 # core APPS
@@ -224,7 +227,17 @@ def incJan18():
 
 def incFeb18():
     global counterFeb2018
-    counterFeb2018=counterFeb2018+1                          
+    counterFeb2018=counterFeb2018+1    
+
+def incMar18():
+    global counterMarch2018
+    counterMarch2018=counterMarch2018+1
+
+def incApr18():
+    global counterApril2018
+    counterApril2018=counterApril2018+1    
+
+
       
 
 def incDec ():
@@ -416,6 +429,8 @@ def updateIndividualCount(kioskNameMash,posterName):
  
         
 counterManager = {
+    "2018-04" : incApr18,
+    "2018-03" : incMar18,
     "2018-02" : incFeb18,
     "2018-01" : incJan18,
     "2017-12" : incDec17,
@@ -455,7 +470,7 @@ def getSelfieClicks():
     if (client == None):
         print ("Error connecting to URL");
         return;
-    query="select * FROM appIconClick WHERE appName='selfie' AND city='kc'"
+    query="select * FROM appIconClick WHERE appName='selfie' AND city='"+city+"'"
     filename="selfie.json"
     result=client.query(query)
     with open (filename,'w') as f:
@@ -491,7 +506,7 @@ def getSMSRequests():
     if (client == None):
         print ("Error connecting to URL");
         return;
-    query="select * FROM smsRequest WHERE city='kc'"
+    query="select * FROM smsRequest WHERE city='" + city +"'"
     filename="sms.json"
     result=client.query(query)
     with open (filename,'w') as f:
@@ -525,7 +540,7 @@ def getSMSRequestsFromFile():
                     else:
                         updateKioskSMS(click[3])        
     
-def connect (currentMonth,onlyToday=False):
+def connect (currentMonth,onlyToday=False,forDate=None):
    
     client=InfluxDBClient(URL,PORT,uname,password,dbname)
     if (client == None):
@@ -544,26 +559,32 @@ def connect (currentMonth,onlyToday=False):
     year = time.strftime("%Y")
     endyear=year
     lastMonth=int(today)-1
-    print (lastMonth)
+    
     if lastMonth == 0:
         lastMonth=12
         yearint=int(year)-1
-        print (yearint)
         year='0{0}'.format(yearint)[-4:]
-        print (year)
-
+    
     strformat='0{0}'.format(lastMonth)[-2:]
     startDay=year+"-"+strformat+"-01"
     strformat='0{0}'.format(today)[-2:]
     endDay=endyear+"-"+strformat+"-01"    
 
-    print (startDay,"to " , endDay)
-    
 
     for click in clickBaits:
-        
-        if currentMonth == True:
-            query="select * from " + click + " where time >= '" +startDay + "' and time < '" + endDay + "'"
+        if onlyToday == True:
+            if forDate is None:
+                d = datetime.datetime(2018, 5, 1, 00, 00)
+            else:
+                d=datetime.datetime.strptime(forDate,"%Y-%m-%d")    
+            startDay=d.strftime("%Y-%m-%d")
+            tomorrow=d+datetime.timedelta(days=1)
+            endDay=tomorrow.strftime("%Y-%m-%d")
+            print (startDay,"to " , endDay)
+            query="select * from " + click + " where city='"+city+"' and time >= '" +startDay + "' and time < '" + endDay + "'"
+            filename=click+"_daily.json"
+        elif currentMonth == True:
+            query="select * from " + click + " where city='"+city+"' and time >= '" +startDay + "' and time < '" + endDay + "'"
             filename=click+"_currentMonth.json"
         else:
             query="select * from " + click
@@ -634,6 +655,12 @@ def clearCounters ():
         global counterFeb2018 
         counterFeb2018=0
 
+        global counterMarch2018
+        counterMarch2018=0
+
+        global counterApril2018
+        counterApril2018=0
+
            
 def printSelfieCharts(textOnly=False):
     if not textOnly:
@@ -668,8 +695,45 @@ def printSelfieCharts(textOnly=False):
         pie_chart.add("Selfies",yaxis)
         
     print("*"*60)
-    print("Total selfies taken is ", total)    
-    #pie_chart.render_to_png ("selfies.png")       
+    print("Total selfies taken is ", total)  
+    if not textOnly:  
+        pie_chart.render_to_file ("selfies.svg")       
+
+
+def printTodayCharts(textOnly=False):
+    if not textOnly:
+        import pygal
+        
+    import operator    
+    import time
+## dd/mm/yyyy format
+    today= (time.strftime("%d/%m/%Y"))
+    if not textOnly:
+        pie_chart = pygal.Bar(print_values=True, print_values_position='top')
+        pie_chart.title = "Kiosks With Selfies Total["+str(totalSelfieClicks)+"]  "+str(today)
+
+    localbaits=["clicked"]
+    for click in clickBaits:
+        print (40*"-")
+        print (click)
+        print (40*"-")
+        filename=click+"_daily.json"
+        with open (filename,"r") as jsonfile:
+            data=json.load(jsonfile)
+            keys=data.keys()
+            for key in keys:   
+                value=data[key]
+                lent=list(value[0])
+                for lentee in lent:
+                    if lentee == "values":
+                        clicks= (data[key][0][lentee])
+                        for click in clicks:
+                            try:
+                                print(click)
+                            except IndexError:
+                                print ("SomethingOff"+str(len(click)))
+                                print(str(click[0])+","+str(click[3]))
+
 
 def printSMSRequests():
     import pygal
@@ -772,12 +836,19 @@ def dsum (*dicts):
             ret[k] += v
     return dict(ret)        
 
-def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
+
+    
+def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=False):
   
     strformat=""
     if selfieOnly == True:
         printSelfieCharts()
         return
+
+    if onlyToday == True:
+        printTodayCharts()
+        return
+
 
     global totalInteraction
     totalInteraction=0
@@ -790,7 +861,9 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
 
         # 2017 has started
         olditer=1
-        if currentMonth == True:
+        if onlyToday == True:
+            filename=clickBait+"_daily.json"
+        elif currentMonth == True:
             filename=clickBait + "_currentMonth.json"
         else:        
             filename=clickBait + ".json"
@@ -814,7 +887,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                 if any(strformat in str(clickpart) for clickpart in click) == False:
                                     print ("Not of this month",strformat)
                                     continue
-                                    
+                            # dirty test data        
                             if any (c.lower() in str(clickpart).lower() for clickpart in click for c in kioskWrongData):
                                 offset = offset +1
                                 continue
@@ -859,12 +932,14 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                                         
                                 
         print (40*"-")                        
-        print (captions[i]," : ", counterFeb2018)
+        print (captions[i]," : ", counterApril2018)
         i=i+1
         #print(captions[i])
-        globalStats[clickBait]=counterFeb2018
+        globalStats[clickBait]=counterApril2018
         
         if currentMonth==False:
+            print ("Total Clicks in Mar 2018 ", counterApril2018)
+            print ("Total Clicks in Mar 2018 ", counterMarch2018)
             print ("Total Clicks in Feb 2018 ", counterFeb2018)
             print ("Total Clicks in Jan 2017 ", counterJan2018)
             print ("Total Clicks in Dec 2017 ", counterDec2017)
@@ -906,7 +981,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
         sfilename=clickBait+".png"
         bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017","Feb2017","Mar2017","April 2017","May2017","June'17","July'17","Aug 17"]
         if textOnly == False:
-            bar_chart.render_to_png(sfilename)
+            bar_chart.render_to_file(filename)
 
 
         import operator
@@ -1001,7 +1076,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
             if textOnly == False:
                 pie_chart.x_labels=xaxis
                 pie_chart.add(clickBait,yaxis)
-                pie_chart.render_to_png ("topkiosk.png")      
+                pie_chart.render_to_file ("topkiosk.svg")      
           
             xaxis=[]
             yaxis=[]
@@ -1017,7 +1092,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
                 pie_chart.x_labels=xaxis
                 pie_chart.add(clickBait,yaxis)
 
-                pie_chart.render_to_png ("topposter.png") 
+                pie_chart.render_to_file ("topposter.svg") 
     
    
     
@@ -1032,7 +1107,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
     if textOnly == False:
         pie_chart.x_labels=xaxis
         pie_chart.add(clickBait,yaxis)  
-        pie_chart.render_to_png ("coreapps.png") 
+        pie_chart.render_to_file ("coreapps.svg") 
 
     
     sortedKiosk=dsum(scKiosk,scKiosk2)
@@ -1056,6 +1131,8 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False):
 
 def run(arg):
     global clickBaits
+    global city
+    print ("Doing for city="+city)
     if arg == "full":
         loadConfig()
         connect(False)
@@ -1129,8 +1206,9 @@ def run(arg):
 
     if arg == "today":
         loadConfig()
-        connect(today=True)
-        formatOutput(onlyToday=True,textOnly=True)
+        connect(currentMonth=False,onlyToday=True,forDate=fordate)
+        formatOutput(currentMonth=False,onlyToday=True,textOnly=True)
+
 
             
 
@@ -1154,12 +1232,20 @@ if __name__ == '__main__':
                         action="store")
     parser.add_argument("-c",
                         "--city",
-                        dest=city,
-                        action="store")                    
+                        dest="city",
+                        action="store") 
+    parser.add_argument("-d",
+                        "--date",
+                        dest="date",
+                        action="store")                                        
     args=parser.parse_args()                    
-        
+    if args.city:
+        city=args.city   
+    if args.date:
+        fordate=args.date  
+    else:
+        fordate=None       
     if args.mode:
-        print ("Arguments passed");
         run(args.mode)
     else:
         run ("output")   
