@@ -16,9 +16,10 @@ class ColorModes(Enum):
 
 
 
-def setup():
+def setup(dev='/dev/ttyS4'):
     print("In Setup")
-    ser=serial.Serial(0)
+    ser=serial.Serial()
+    ser.port=dev
     ser.baudrate = 115200
     ser.bytesize = serial.EIGHTBITS #number of bits per bytes
     ser.parity = serial.PARITY_NONE #set parity check: no parity
@@ -32,10 +33,12 @@ def setup():
     ser.writeTimeout = 2     #timeout for write
 
     try: 
-        ser.open()
-    except Exception:
+        if ser.is_open == False:
+            ser.open()
+    except Exception as ex:
         print ("error open serial port: ")
-        exit()
+        print(ex)
+        #exit()
 
 def protocol(theMode,r=0,g=0,b=0,delay=0,repeat=0):
     print("Protocol to ", theMode,r,g,b,delay,repeat)
@@ -59,14 +62,19 @@ def protocol(theMode,r=0,g=0,b=0,delay=0,repeat=0):
     strcmd=bytes(decarray).hex()
     print(strcmd)
 
-    exit()
-
+    
     send(strcmd)
     time.sleep(0.5)
     numLines=0
     while True:
         response=ser.readline()
-        print("read data:" + response)
+        print("read data:" + str(response)
+        try:
+            hexresp=bytearray.fromhex(str(response)
+        except Exception as exp:
+            print(exp)
+            print("Error debugging response from controller")    
+
         numLines=numLines+1
 
         if (numLines > 3):
@@ -75,8 +83,8 @@ def protocol(theMode,r=0,g=0,b=0,delay=0,repeat=0):
 
 
 def send(theString):
-    if ser.isOpen():
-        ser.write(theString)
+    if ser.is_open:
+        ser.write(theString.encode())
     else:
         print("The serial port is not open")        
 
@@ -97,12 +105,19 @@ if __name__ == "__main__":
 
     ''' options are -a 1-4 
                     -m r,g,b values in integer
-                    -c r,g,b,delay,repeat in integer '''
+                    -c r,g,b,delay,repeat in integer
+                    -d dev '''
 
     parser.add_argument('-a',
                         "--auto",
                         dest="auto",
                         action="store",type=int)           
+    
+    parser.add_argument('-d',
+                        "--dev",
+                        dest="dev",
+                        action="store")           
+                    
 
     parser.add_argument('-s',
                         "--static",
@@ -115,20 +130,22 @@ if __name__ == "__main__":
                         nargs="+",type=int)     
     
     args=parser.parse_args() 
+    if args.dev:
+        setup(dev)
+    else:
+        setup()
     if args.auto:
         print("Auto mode",args.auto)
-        setup()
+        
         protocol(args.auto)
 
     if args.static:
         print("static mode",args.static)
         print(args.static[1])
-        setup()
         protocol(5,r=args.static[0],g=args.static[1],b=args.static[2])
 
     if args.blinking:
         print("blinking mode",args.blinking)
-        setup()
         protocol(5,r=args.blinking[0],g=args.blinking[1],b=args.blinking[2],delay=args.blinking[3],repeat=args.blinking[4])
 
     print ("Entered"  )  
