@@ -28,20 +28,20 @@ clickBaits = [
     ,"streetcarClick"
     ,"adCardClick"
 ]
-captions = [
-    "Translation Pressed"
-    ,"Map Clicks"
-    ,"Apps Pressed"
-    ,"Smart Card Landing Pages Clicked"
-    ,"Wayfinding"
-    ,"App Request"
-    ,"SMS Request"
-    ,"Voice Search"
-    ,"Disability"
-    ,"Transit /StreetCar"
-    ,"Streetcar"
-    ,"AdCardClick"
-]
+captions = {
+   "translate": "Translation Pressed"
+    ,"mapClick":"Map Clicks"
+    ,"appIconClick":"Apps Pressed"
+    ,"clicked":"Smart Card Landing Pages Clicked"
+    ,"wayfinding":"Wayfinding"
+    ,"appRequest":"App Request"
+    ,"smsRequest":"SMS Request"
+    ,"voicesearch":"Voice Search"
+    ,"disability":"Disability"
+    ,"transit":"Transit /StreetCar"
+    ,"streetcarClick":"Streetcar"
+    ,"adCardClick":"AdCardClick"
+}
 graphs = ["./"+a+".png" for a in clickBaits ]
 
 totalInteraction=0
@@ -932,7 +932,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
                                         
                                 
         print (40*"-")                        
-        print (captions[i]," : ", counterApril2018)
+        print (captions[clickBait]," : ", counterApril2018)
         i=i+1
         #print(captions[i])
         globalStats[clickBait]=counterApril2018
