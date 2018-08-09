@@ -9,6 +9,16 @@ import iso8601
 import pandas as pd
 from influxdb import InfluxDBClient
 
+#"time", "adposterId", "adposterName", "city", "kioskId", "kioskName", "posterId", "posterName",
+COL_KIOSK_ID=3
+COL_KIOSK_NAME=4
+COL_POSTER_NAME=7
+
+tempClickCount=0
+KIOSK_COUNT=10
+
+indivPC=True
+
 clickBaits = [
   
   "translate"
@@ -22,7 +32,7 @@ clickBaits = [
     
     ,"appRequest"
     ,"smsRequest"
-    ,"voiceearch"
+    ,"voicesearch"
     ,"disability"
     ,"transit"
     ,"streetcarClick"
@@ -42,7 +52,7 @@ captions = {
     ,"streetcarClick":"Streetcar"
     ,"adCardClick":"AdCardClick"
 }
-graphs = ["./"+a+".png" for a in clickBaits ]
+graphs = ["./"+a+".svg" for a in clickBaits ]
 
 totalInteraction=0
  
@@ -69,10 +79,19 @@ counterJan2018=0
 counterFeb2018=0
 counterMarch2018=0
 counterApril2018=0
+counterMay2018=0
+counterJune2018=0
+counterJuly2018=0
+# support for range click count
+counterCustom=0
 
 globalStats={}
 city="kc"
 fordate=None
+rangeInDays=1
+rangeInWeeks=0
+customRange=False
+textModeOutput=False
 
           
 URL=""
@@ -80,6 +99,8 @@ PORT=0
 uname=""
 password = ""
 dbname=""
+
+dbs={}
 
 totalSelfieClicks=0
 totalSms=0
@@ -167,11 +188,24 @@ kioskWrongData= [
     "Kcatademo","BlueLine","TRAILS","Bangalore","demo","duke1","nanov2","nanov1","duke22057"
 ]
 
+ConfigFile="./config.json"
+
 # core APPS
 totalStreetCar=0
 totalStreetCar2=0
 totalWayfinding=0
 totalMulti=0
+
+def customClickCount():
+    global counterCustom
+    counterCustom+=1
+
+def incJuly18():
+    global counterJuly2018
+    counterJuly2018=counterJuly2018+1
+def incJune18():
+    global counterJune2018
+    counterJune2018=counterJune2018+1
 
 def incJan ():
     global counterJan2017
@@ -237,6 +271,11 @@ def incApr18():
     global counterApril2018
     counterApril2018=counterApril2018+1    
 
+def incMay18():
+    global counterMay2018
+    counterMay2018=counterMay2018+1 
+
+
 
       
 
@@ -265,15 +304,41 @@ def incJun ():
 def incNoop ():
     print (":Empty funcion")    
 
-def updateKioskSMS(kioskNameG):
+
+counterManager = {
+    "2018-07" : incJuly18,
+   "2018-06"  : incJune18,
+    "2018-05" : incMay18,
+    "2018-04" : incApr18,
+    "2018-03" : incMar18,
+    "2018-02" : incFeb18,
+    "2018-01" : incJan18,
+    "2017-12" : incDec17,
+    "2017-11" : incNov17,
+    "2017-10" : incOct17,
+    "2017-09" : incSep17,
+    "2017-08" : incAug17,
+    "2017-07" : incJuly17,
+    "2017-06" : incJune17,
+    "2017-05" : incMay17,
+    "2017-04" : incApr,
+    "2017-03" : incMar,
+    "2017-02" : incFeb,
+    "2017-01" : incJan,
+    "2016-12" : incDec,
+    "2016-11" : incNov,
+    "2016-10" : incOct, 
+    "2016-09" : incSept,
+    "2016-08" : incAug,
+    "2016-07" : incJul, 
+    "2016-06" : incJun 
+};          
+
+
+def updateKioskSMS(kioskName):
     global smsKiosks
     global totalSms
-    try:
-        kioskName=kioskMap[kioskNameG]
-
-    except KeyError:
-        print ("no kiosks in selfiekiosk ",kioskNameG)
-        return
+   
 
     totalSms+=1
     if not kioskName in smsKiosks:
@@ -282,15 +347,9 @@ def updateKioskSMS(kioskNameG):
         smsKiosks[kioskName] += 1
 
 
-def updateKioskSelfie (kioskNameG):
+def updateKioskSelfie (kioskName):
     global selfieKiosks
     global totalSelfieClicks
-
-    try:
-        kioskName=kioskMap[kioskNameG]
-    except KeyError:
-        print ("unknonw kiosk name.",kioskNameG,"...returning")
-        return
 
     totalSelfieClicks=totalSelfieClicks+1
     if not kioskName in selfieKiosks:
@@ -353,24 +412,14 @@ adClicks=0
 def updateAdCount(click):
     global adMistakes
     global kioskMap
-    location = click[4]
-    try:
-        kioskName=kioskMap[location]
-    except KeyError:
-        print ("Could not find ",location)
-        adMistakes+=1
-        return    
-
-    if kioskName == "":
-        adMistakes+=1
-        return
+    location = click[COL_KIOSK_ID]
 
     global adCardKioks
     
-    if not kioskName in adCardKioks:
-        adCardKioks[kioskName]=1
+    if not location in adCardKioks:
+        adCardKioks[location]=1
     else:
-        adCardKioks[kioskName]+=1
+        adCardKioks[location]+=1
 
     global adClicks
     adClicks+=1   
@@ -401,9 +450,11 @@ def updateWayfindingKiosks (click):
             
 
 def updateIndividualCount(kioskNameMash,posterName):
+    global tempClickCount
     global kioskCount
     global posterCount
     global kioskPosterMap
+
 
     kioskNameList=kioskNameMash.split("_")
     if len(kioskNameList) ==2:
@@ -425,38 +476,15 @@ def updateIndividualCount(kioskNameMash,posterName):
     if not newname in kioskPosterMap:
         kioskPosterMap[newname]=1
     else:
-        kioskPosterMap[newname] += 1    
+        kioskPosterMap[newname] += 1   
+    
+    tempClickCount += 1     
+
  
         
-counterManager = {
-    "2018-04" : incApr18,
-    "2018-03" : incMar18,
-    "2018-02" : incFeb18,
-    "2018-01" : incJan18,
-    "2017-12" : incDec17,
-    "2017-11" : incNov17,
-    "2017-10" : incOct17,
-    "2017-09" : incSep17,
-    "2017-08" : incAug17,
-    "2017-07" : incJuly17,
-    "2017-06" : incJune17,
-    "2017-05" : incMay17,
-    "2017-04" : incApr,
-    "2017-03" : incMar,
-    "2017-02" : incFeb,
-    "2017-01" : incJan,
-    "2016-12" : incDec,
-    "2016-11" : incNov,
-    "2016-10" : incOct, 
-    "2016-09" : incSept,
-    "2016-08" : incAug,
-    "2016-07" : incJul, 
-    "2016-06" : incJun 
-};          
-
 def loadConfig ():
     global URL,PORT,uname,password,dbname
-    with open ("./config.json", 'r') as configFile:
+    with open (ConfigFile, 'r') as configFile:
         data=json.load(configFile)
         URL = data['mongodb']['host']
         PORT = data['mongodb']['port']
@@ -491,10 +519,11 @@ def getSelfieFromFile():
         for lentee in lent:
             if lentee == "values":
                 clicks= (data[key][0][lentee])
-                print("Clicks:",clicks) 
+                
                 for click in clicks:
                     if "Bangalore" in click or "bangalore" in click:
-                        print ("There is banglore kciosk selfie")
+                        #print ("There is banglore kciosk selfie")
+                        pass
                     else:    
                         updateKioskSelfie(click[4])    
                             
@@ -538,14 +567,23 @@ def getSMSRequestsFromFile():
                         #print ("There is banglore kciosk selfie")
                         pass
                     else:
-                        updateKioskSMS(click[3])        
+                        updateKioskSMS(click[4])        
     
-def connect (currentMonth,onlyToday=False,forDate=None):
+def connect (currentMonth,customDate=False,forDate=None):
    
-    client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    #client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    #to support new influxdb 1.5
+    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
     if (client == None):
         print ("Error connecting to URL");
-        return;
+        exit;
+
+    global dbs
+    dbs = client.get_list_database()
+
+       
+    # pity no error code here
+    client.switch_database(city)
 
     today= int(time.strftime("%m"))
     if int(time.strftime("%d")) > 15:
@@ -572,14 +610,20 @@ def connect (currentMonth,onlyToday=False,forDate=None):
 
 
     for click in clickBaits:
-        if onlyToday == True:
+        if customDate == True:
             if forDate is None:
-                d = datetime.datetime(2018, 5, 1, 00, 00)
+                d = datetime.datetime.today()
             else:
                 d=datetime.datetime.strptime(forDate,"%Y-%m-%d")    
             startDay=d.strftime("%Y-%m-%d")
-            tomorrow=d+datetime.timedelta(days=1)
+            tomorrow=d+datetime.timedelta(days=rangeInDays)
             endDay=tomorrow.strftime("%Y-%m-%d")
+            ''' to account for negative range '''
+            if startDay > endDay:
+                temp=startDay
+                startDay=endDay
+                endDay=temp
+
             print (startDay,"to " , endDay)
             query="select * from " + click + " where city='"+city+"' and time >= '" +startDay + "' and time < '" + endDay + "'"
             filename=click+"_daily.json"
@@ -603,6 +647,12 @@ def connect (currentMonth,onlyToday=False,forDate=None):
         
        
 def clearCounters ():
+        global counterCustom
+        counterCustom=0
+        global counterJuly2018
+        counterJuly2018=0
+        global counterJune2018
+        counterJune2018=0
         global counterDec
         counterDec=0
         global counterNov
@@ -661,6 +711,12 @@ def clearCounters ():
         global counterApril2018
         counterApril2018=0
 
+        global counterMay2018
+        counterMay2018=0
+
+        global curentMonth
+        currentMonth=0
+
            
 def printSelfieCharts(textOnly=False):
     if not textOnly:
@@ -683,7 +739,7 @@ def printSelfieCharts(textOnly=False):
     xaxis=[]
     yaxis=[]
     for x in range(len(sortedKiosk)):
-        if x < 10:
+        if x < KIOSK_COUNT:
             xaxis.append(sortedKiosk[x][0])
             yaxis.append(sortedKiosk[x][1])
                  
@@ -765,7 +821,7 @@ def printSMSRequests():
     pie_chart.add("SMS",yaxis)
     print("*"*60)
     print("Total SMS taken is ", total)    
-    #pie_chart.render_to_png ("sms.png")                    
+    pie_chart.render_to_file ("sms.svg")                    
     
 
 from IPython.display import display, HTML
@@ -838,30 +894,23 @@ def dsum (*dicts):
 
 
     
-def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=False):
+def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, customDate=False):
   
     strformat=""
     if selfieOnly == True:
         printSelfieCharts()
         return
 
-    if onlyToday == True:
-        printTodayCharts()
-        return
-
-
     global totalInteraction
     totalInteraction=0
        
     i=0    
     for clickBait in clickBaits:
-        if clickBait != "streetcarClick":
-            clearCounters()
         clearCounters()    
 
         # 2017 has started
         olditer=1
-        if onlyToday == True:
+        if customDate == True:
             filename=clickBait+"_daily.json"
         elif currentMonth == True:
             filename=clickBait + "_currentMonth.json"
@@ -870,9 +919,14 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
 
         
         with open (filename,"r") as jsonfile:
+            
             data=json.load(jsonfile)
             keys=data.keys()
-            for key in keys:   
+            
+            for key in keys:
+                if key != 'series':
+                    continue
+
                 value=data[key]
                 lent=list(value[0])
                 
@@ -895,14 +949,17 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
                             totalInteraction = totalInteraction + 1          
 
                             if clickBait == "clicked":
-                                updateIndividualCount(click[3],click[5])
+                                colposterid = COL_POSTER_NAME
+                                if city == "louisville":
+                                    colposterid = colposterid+1
+                                updateIndividualCount(click[COL_KIOSK_ID],click[colposterid])
 
                             if clickBait == "streetcarClick":
                                 updateKioskStreetCar(click[3])   
                              
                             if clickBait == "transit":  
                                 #print ("updating transit as streetcar")
-                                updateKioskTransitStreetCar(click[3])    
+                                updateKioskTransitStreetCar(click[4])    
 
                             if clickBait == "appIconClick":    
                                 updateAppClick(click[1],click[4])   
@@ -920,70 +977,36 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
                             if clickBait== "translate":
                                 global totalMulti
                                 totalMulti=totalMulti +1   
-                                
-                              
-                            keys = counterManager.keys()
-                            for key in keys:
-                                if any (key in str(c) for c in click):
-                                    counterManager.get(key,incNoop) ()
-                                    break;  
+
+                            if customRange == True:
+                                customClickCount()                    
+                            else:
+                                keys = counterManager.keys()
+                                for key in keys:
+                                    if any (key in str(c) for c in click):
+                                        counterManager.get(key,incNoop) ()
+                                        break;  
 
                             
                                         
                                 
-        print (40*"-")                        
-        print (captions[clickBait]," : ", counterApril2018)
+        print (40*"-")  
+        caption="Data"
+        try:
+            caption=captions[clickBait]
+        except:
+            caption="Data" 
+
+        if customRange == True:
+            print (caption,counterCustom)
+        else:
+            print (caption,counterJuly2018)
         i=i+1
         #print(captions[i])
-        globalStats[clickBait]=counterApril2018
-        
-        if currentMonth==False:
-            print ("Total Clicks in Mar 2018 ", counterApril2018)
-            print ("Total Clicks in Mar 2018 ", counterMarch2018)
-            print ("Total Clicks in Feb 2018 ", counterFeb2018)
-            print ("Total Clicks in Jan 2017 ", counterJan2018)
-            print ("Total Clicks in Dec 2017 ", counterDec2017)
-            print ("Total Clicks in Nov 2017 ", counterNov2017)
-            print ("Total Clicks in Sept 2017 ", counterSept2017)
-            print ("Total Clicks in August 2017 ", counterAugust2017)
-            print ("Total Clicks in July 2017 ", counterJuly2017)
-            print ("Total Clicks in June 2017 ", counterJune2017)
-            print ("Total Clicks in May 2017 ", counterMay2017)
-            print ("Total Clicks in Apr 2017 ", counterApr2017)
-            print ("Total Clicks in Mar 2017 ", counterMar2017)
-            print ("Total Clicks in Feb 2017 ", counterFeb2017)                   
-            print ("Total Clicks in Jan 2017 ", counterJan2017) 
-            print ("Total Clicks in Dec ", counterDec) 
-            print ("Total Clicks in Nov ", counterNov) 
-            print ("Total Clicks in Oct ", counterOct)      
-            print ("Total Clicks in September ", counterSept) 
-            print ("Total Clicks in August ", counterAug) 
-            print ("Total Clicks in July ", counterJuly) 
-            print ("Total Clicks in June ", counterJune)   
-
-        
-        
+        globalStats[clickBait]=counterJuly2018
+         
         import pygal
         import calendar
-
-        bar_chart=pygal.Bar(print_values=True, print_values_position='top')
-        if clickBait == "clicked":
-            bar_chart.title="Total Monthly Smart Card interactions by month"
-        else:
-             bar_chart.title="Total Monthly interactions by month"   
-        if clickBait=="transit":
-           pass
-
-        bar_chart.add(clickBait,[counterJune,counterJuly,counterAug,counterSept,counterOct,counterNov,counterDec,counterJan2017,counterFeb2017, counterMar2017, counterApr2017,counterMay2017,counterJune2017, counterJuly2017,counterAugust2017])
-       
-
-        filename=clickBait+".svg"
-        sfilename=clickBait+".png"
-        bar_chart.x_labels=["June","July","August","Sept","Oct","Nov","Dec","Jan017","Feb2017","Mar2017","April 2017","May2017","June'17","July'17","Aug 17"]
-        if textOnly == False:
-            bar_chart.render_to_file(filename)
-
-
         import operator
 
         xaxis=[]
@@ -994,12 +1017,15 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
             print ("Top ad locations")
             sortedKiosk=sorted( adCardKioks.items(),key=operator.itemgetter(1))
             sortedKiosk.reverse()
-            print (len(sortedKiosk))
-            for x in range(len(sortedKiosk)):
-                print (sortedKiosk[x][0],sortedKiosk[x][1] )
-                if textOnly == False:
-                    xaxis.append(sortedKiosk[x][0])
-                    yaxis.append(sortedKiosk[x][1])
+            
+            for x in range(KIOSK_COUNT):
+                try:
+                    print (sortedKiosk[x][0],sortedKiosk[x][1] )
+                    if textOnly == False:
+                        xaxis.append(sortedKiosk[x][0])
+                        yaxis.append(sortedKiosk[x][1])
+                except Exception:
+                    pass        
             
             if textOnly == False:   
                 pie_chart.x_labels=xaxis
@@ -1015,8 +1041,11 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
             sortedKiosk.reverse()
             
             pie_chart.title = "Top 5 AppIcon Clicks"
-            
-            for x in range(len(sortedKiosk)):
+            if len(sortedKiosk) < KIOSK_COUNT:
+                a=len(sortedKiosk)
+            else:
+                a=KIOSK_COUNT
+            for x in range(a):
                 print (sortedKiosk[x][0],":",sortedKiosk[x][1])
                 if textOnly == False:
                     xaxis.append(sortedKiosk[x][0])
@@ -1032,21 +1061,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
             
         if clickBait == "streetcarClick" or clickBait =="transit":
             pass
-          #  print ("Kiosk based StreetCar Clicks")
-            #sortedKiosk=sorted( scKiosk.items(),key=operator.itemgetter(1))
-           # sortedKiosk=dsum(scKiosk,scKiosk2)
-           # sortedKiosk=sorted(sortedKiosk.items(), key=operator.itemgetter(1))
-            #sortedKiosk.reverse()
-
-         #   pie_chart.title = "Top 5 StreetCar Clicks By Location"
-         #   for x in range(len(sortedKiosk)):
-         #       print (sortedKiosk[x][0],":",sortedKiosk[x][1])
-         #       xaxis.append(sortedKiosk[x][0])
-         #       yaxis.append(sortedKiosk[x][1])
-         #   if textOnly == False:
-         #       pie_chart.x_labels=xaxis
-         #       pie_chart.add(clickBait,yaxis)
-         #       pie_chart.render_to_png ("streetcartop.png")  
+         
             
         if clickBait == "clicked":
             print ("The individual stats")
@@ -1067,23 +1082,33 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
             # top 5 
             xaxis=[]
             yaxis=[]
-            pie_chart.title = "Top 5 Kiosk Clicks By Location"
-            print ("Top 5 Kiosk Clicks By Location")
-            for x in range(len(sortedKiosk)):
+            pie_chart.title = "Top Kiosk Clicks By Location"
+            print ("Top Kiosk Clicks By Location")
+            if len(sortedKiosk) < KIOSK_COUNT:
+                a=len(sortedKiosk)
+            else:
+                a=KIOSK_COUNT
+            for x in range(a):
                  print (sortedKiosk[x][0],":",sortedKiosk[x][1])
                  xaxis.append(sortedKiosk[x][0])
                  yaxis.append(sortedKiosk[x][1])
             if textOnly == False:
                 pie_chart.x_labels=xaxis
                 pie_chart.add(clickBait,yaxis)
-                pie_chart.render_to_file ("topkiosk.svg")      
+                pie_chart.render_to_png ("topkiosk.png")      
           
             xaxis=[]
             yaxis=[]
             pie_chart = pygal.Bar(print_values=True, print_values_position='top')
             pie_chart.title = "Top 5 Poster Clicks"
             print ("Top 5 Poster Clicks ")
-            for x in range(10):
+            print (40*'|')
+            if len(sortedKiosk) < 5:
+                a=len(sortedKiosk)
+            else:
+                a=5
+            a=5     
+            for x in range(a):
                 print (sortedPoster[x][0],":",sortedPoster[x][1])
                 xaxis.append(sortedPoster[x][0])
                 yaxis.append(sortedPoster[x][1])
@@ -1092,32 +1117,34 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, onlyToday=
                 pie_chart.x_labels=xaxis
                 pie_chart.add(clickBait,yaxis)
 
-                pie_chart.render_to_file ("topposter.svg") 
+                pie_chart.render_to_png ("topposter.png") 
     
    
     
     
     xaxis=[]
     yaxis=[]
-    pie_chart = pygal.Bar(print_values=True, print_values_position='top')
-    xaxis=["StreetCar","Wayfinding","Multilanguage"]
-    yaxis=[totalStreetCar,totalWayfinding,totalMulti]
+    pie_chart = pygal.Pie()
     pie_chart.title = "Core Apps Interactions till date"
-    print ("Core Apps Interactions")
     if textOnly == False:
-        pie_chart.x_labels=xaxis
-        pie_chart.add(clickBait,yaxis)  
-        pie_chart.render_to_file ("coreapps.svg") 
-
+        for name,data in globalStats.items():
+            pie_chart.add(name,int(data))
+        pie_chart.render_to_png('./report_new.png') 
     
     sortedKiosk=dsum(scKiosk,scKiosk2)
     sortedKiosk=sorted(sortedKiosk.items(), key=operator.itemgetter(1))
     sortedKiosk.reverse()
 
-    for x in range(len(sortedKiosk)):
+    if len(sortedKiosk) < KIOSK_COUNT:
+        a=len(sortedKiosk)
+    else:
+        a=KIOSK_COUNT
+    print ("Top SC interactions")
+    for x in range(a):
         print (sortedKiosk[x][0],":",sortedKiosk[x][1])
         
     print("Total Interactions="+str(totalInteraction))
+    print("Total ClickCount="+str(tempClickCount))
     print ("Total StreetCar", totalStreetCar+totalStreetCar2)
     print("Total Wayfinding", totalWayfinding)
     print("Total Multi", totalMulti)   
@@ -1148,7 +1175,7 @@ def run(arg):
         clickBaits=["streetcarClick","transit"]
         loadConfig()
         connect(False)
-        formatOutput(currentMonth=True,textOnly=True)
+        formatOutput(currentMonth=True,textOnly=False)
 
     if arg == "clicked":
         
@@ -1167,7 +1194,7 @@ def run(arg):
     if arg == "currentMonthAd":
        
         clickBaits=["adCardClick"]
-        formatOutput(currentMonth=True,textOnly=True)
+        formatOutput(currentMonth=True,textOnly=False)
 
     if arg == "adFull":
         
@@ -1177,6 +1204,7 @@ def run(arg):
         formatOutput()
 
     if arg == "connect":
+        loadConfig()
         connect(False)
 
     if arg == "configTest":
@@ -1202,23 +1230,30 @@ def run(arg):
     if arg == "current":
         loadConfig()
         connect(currentMonth=True)
-        formatOutput(currentMonth=True,textOnly=True)
+        formatOutput(currentMonth=True,textOnly=False)
 
     if arg == "today":
         loadConfig()
-        connect(currentMonth=False,onlyToday=True,forDate=fordate)
-        formatOutput(currentMonth=False,onlyToday=True,textOnly=True)
+        connect(currentMonth=False,customDate=True,forDate=fordate)
+        formatOutput(currentMonth=False,customDate=True,textOnly=True)
 
 
+    if arg == "days":
+        loadConfig()
+        connect(currentMonth=False,customDate=True,forDate=fordate)
+        formatOutput(currentMonth=False,customDate=True,textOnly=True)
             
 
     if arg == "currentFromFile":
         formatOutput(currentMonth=True, textOnly=True)
         
             
-    if arg == "armyData":
+
+    if arg == "uptime":
+        clickBaits=["ageOfAdpost","ageOfSmartPost"]
         loadConfig()
-        connect(currentMonth=False)
+        connect(currentMonth=True)
+        formatOutput(currentMonth=True)
 
 
     
@@ -1237,14 +1272,37 @@ if __name__ == '__main__':
     parser.add_argument("-d",
                         "--date",
                         dest="date",
-                        action="store")                                        
-    args=parser.parse_args()                    
+                        action="store") 
+    parser.add_argument("-r",
+                        "--rangeInDays",
+                        dest="range",
+                        action="store", type=int)      
+    parser.add_argument("-f",
+                        "--configFile",
+                        dest="cfg",
+                        action="store") 
+
+    parser.add_argument("-k",
+                        "--kioskCombined",
+                        dest="kcomb",
+                        action="store") 
+
+
+    args=parser.parse_args()       
+    if args.kcomb:
+        indivPC=False             
     if args.city:
         city=args.city   
     if args.date:
         fordate=args.date  
     else:
-        fordate=None       
+        fordate=None 
+
+    if args.range:
+        rangeInDays=args.range  
+        customRange=True
+    if args.cfg:
+        ConfigFile=args.cfg            
     if args.mode:
         run(args.mode)
     else:
