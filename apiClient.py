@@ -455,6 +455,9 @@ def updateIndividualCount(kioskNameMash,posterName):
     global posterCount
     global kioskPosterMap
 
+    if kioskNameMash is None:
+        print("none kiosk")
+        return
 
     kioskNameList=kioskNameMash.split("_")
     if len(kioskNameList) ==2:
@@ -951,8 +954,16 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, customDate
                             if clickBait == "clicked":
                                 colposterid = COL_POSTER_NAME
                                 if city == "louisville":
-                                    colposterid = colposterid+1
-                                updateIndividualCount(click[COL_KIOSK_ID],click[colposterid])
+                                    colposterid = 8
+                                    kiosknamecol = 6
+
+                                if city == "kc" :
+                                    colposterid = 7
+                                    kiosknamecol = 5
+                                    
+
+                               
+                                updateIndividualCount(click[kiosknamecol],click[colposterid])
 
                             if clickBait == "streetcarClick":
                                 updateKioskStreetCar(click[3])   
@@ -1124,12 +1135,15 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, customDate
     
     xaxis=[]
     yaxis=[]
-    pie_chart = pygal.Pie()
+    pie_chart = pygal.Pie(print_values=True)
+    #pie_chart = pygal.Bar(print_values=True, print_values_position='top')
     pie_chart.title = "Core Apps Interactions till date"
+    
     if textOnly == False:
         for name,data in globalStats.items():
             pie_chart.add(name,int(data))
-        pie_chart.render_to_png('./report_new.png') 
+            
+        pie_chart.render_to_png('./coreapps.png') 
     
     sortedKiosk=dsum(scKiosk,scKiosk2)
     sortedKiosk=sorted(sortedKiosk.items(), key=operator.itemgetter(1))
@@ -1182,7 +1196,7 @@ def run(arg):
         clickBaits=["clicked"]
         loadConfig()
         connect(False)
-        formatOutput()    
+        formatOutput(currentMonth=True,textOnly=False)    
 
     if arg == "adonly":
         clickBaits=["adCardClick"]
