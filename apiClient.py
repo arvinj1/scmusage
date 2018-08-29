@@ -19,6 +19,8 @@ KIOSK_COUNT=10
 
 indivPC=True
 
+kioskMapFile="kiosks.csv"
+
 clickBaits = [
   
   "translate"
@@ -338,6 +340,8 @@ counterManager = {
 def updateKioskSMS(kioskName):
     global smsKiosks
     global totalSms
+
+    
    
 
     totalSms+=1
@@ -497,10 +501,19 @@ def loadConfig ():
 
 def getSelfieClicks():
      
-    client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    #client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
     if (client == None):
         print ("Error connecting to URL");
-        return;
+        exit;
+
+    global dbs
+    dbs = client.get_list_database()
+
+       
+    # pity no error code here
+    client.switch_database(city)
+    
     query="select * FROM appIconClick WHERE appName='selfie' AND city='"+city+"'"
     filename="selfie.json"
     result=client.query(query)
@@ -516,7 +529,10 @@ def getSelfieFromFile():
          data=json.load(f)
 
     keys=data.keys()
-    for key in keys:        
+    for key in keys:  
+        if key != 'series':
+            continue
+
         value=data[key]
         lent=list(value[0])
         for lentee in lent:
@@ -534,10 +550,18 @@ def getSelfieFromFile():
 
   
 def getSMSRequests():
-    client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
     if (client == None):
         print ("Error connecting to URL");
-        return;
+        exit;
+
+    global dbs
+    dbs = client.get_list_database()
+
+       
+    # pity no error code here
+    client.switch_database(city)
+
     query="select * FROM smsRequest WHERE city='" + city +"'"
     filename="sms.json"
     result=client.query(query)
@@ -558,7 +582,10 @@ def getSMSRequestsFromFile():
          data=json.load(f)
 
     keys=data.keys()
-    for key in keys:        
+    for key in keys:     
+        if key != 'series':
+            continue
+           
         value=data[key]
         lent=list(value[0])
         for lentee in lent:
@@ -570,7 +597,7 @@ def getSMSRequestsFromFile():
                         #print ("There is banglore kciosk selfie")
                         pass
                     else:
-                        updateKioskSMS(click[4])        
+                        updateKioskSMS(click[3])        
     
 def connect (currentMonth,customDate=False,forDate=None):
    
@@ -957,7 +984,7 @@ def formatOutput (currentMonth=False,selfieOnly=False,textOnly=False, customDate
                                     colposterid = 8
                                     kiosknamecol = 6
 
-                                if city == "kc" :
+                                if (city == "kc" or city == "umkc") :
                                     colposterid = 7
                                     kiosknamecol = 5
                                     
@@ -1301,8 +1328,27 @@ if __name__ == '__main__':
                         dest="kcomb",
                         action="store") 
 
+    parser.add_argument("-b",
+                        "--dblist",
+                        dest="dblist",
+                        action="store_true") 
 
-    args=parser.parse_args()       
+
+
+
+    args=parser.parse_args()   
+    if args.dblist:
+        loadConfig()
+        client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+        if (client == None):
+            print ("Error connecting to URL");
+            exit;
+
+        dblist=[]
+        dblist = client.get_list_database()
+        print (dblist)
+        exit;
+
     if args.kcomb:
         indivPC=False             
     if args.city:
@@ -1316,7 +1362,8 @@ if __name__ == '__main__':
         rangeInDays=args.range  
         customRange=True
     if args.cfg:
-        ConfigFile=args.cfg            
+        ConfigFile=args.cfg 
+
     if args.mode:
         run(args.mode)
     else:
