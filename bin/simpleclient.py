@@ -1,5 +1,5 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
-# only downloads json files and converts to cvs
+# only downloads json files 
 
 
 import json
@@ -12,6 +12,8 @@ import iso8601
 import pandas as pd
 from influxdb import InfluxDBClient
 
+
+useoldapi=False
 
 clickBaits = [
   "translate"
@@ -144,17 +146,21 @@ def connect (currentMonth,customDate=False,forDate=None):
     startDay,endDay=getQueryRange(currentMonth,customDate,forDate)
     print (startDay," to ", endDay)
 
-    #to support new influxdb 1.5
-    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+    if useoldapi:
+        client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    else:
+        #to support new influxdb 1.5
+        client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
     if (client == None):
         print ("Error connecting to URL");
         exit;
 
-    global dbs
-    dbs = client.get_list_database()
+    if useoldapi == False:
+        global dbs
+        dbs = client.get_list_database()
 
-    # pity no error code here
-    client.switch_database(city)
+        # pity no error code here
+        client.switch_database(city)
 
     for click in clickBaits:
         if customDate == True:
@@ -193,7 +199,7 @@ def run(arg):
         loadConfig()
         connect(currentMonth=False,customDate=True,forDate=fordate)
             
-
+    
     
 if __name__ == '__main__':
     import sys;
@@ -225,12 +231,18 @@ if __name__ == '__main__':
                         dest="cfg",
                         action="store") 
 
-    
+    parser.add_argument("-o",
+                        "--oldclient",
+                        dest="oldclient",
+                        action="store_true") 
+
     
 
                     
     args=parser.parse_args()   
     
+    if args.oldclient:
+        useoldapi=args.oldclient
     if args.city:
         city=args.city   
     if args.date:

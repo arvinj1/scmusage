@@ -7,7 +7,7 @@ ul=$(tput sgr1)
 
 
 #declare -a dirs=($(find . -type d))
-declare -a dirs=('kc' 'lr' 'louisville' 'umkc' 'kci' 'kcata')
+declare -a dirs=('kc' 'lr' 'louisville' 'umkc' 'kci' 'kcata' 'jc')
 for dir in ${dirs[@]}
 do
 	cd $dir
@@ -27,7 +27,7 @@ do
 	echo "--------------------------------"
 	cat ./datausage.txt >> ../$reportName
 	cat ./selfies.txt >> ../$reportName
-	cat ./uptime.txt >> ../$reportName
+	#cat ./uptime.txt >> ../$reportName
 	cd ..
 done
 echo "------" >> $reportName

@@ -3,8 +3,8 @@
 #this one will create ALL the csv output for all the dates 
 
 offsets=(31 28 31 30 31 30 31 31 30 31 30 31)
-startdate=2018-06-01
-enddate=2018-12-01
+startdate=2018-01-01
+enddate=2018-06-01
 offset=86400*30
 
 currentDateTs=$(date -j -f "%Y-%m-%d" $startdate "+%s")

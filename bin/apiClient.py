@@ -9,6 +9,9 @@ import iso8601
 import pandas as pd
 from influxdb import InfluxDBClient
 
+
+useoldapi=False
+
 COL_KIOSK_ID=3
 COL_KIOSK_NAME=4
 COL_POSTER_NAME=7
@@ -339,19 +342,22 @@ def loadConfig ():
         dbname = data['mongodb']['db']
 
 def getSelfieClicks():
-     
-    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+    if useoldapi:
+        client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    else:     
+        client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+    
     if (client == None):
         print ("Error connecting to URL");
         exit;
 
-    global dbs
-    dbs = client.get_list_database()
-
-    # pity no error code here
-    client.switch_database(city)
+    if useoldapi == False:
+        global dbs
+        dbs = client.get_list_database()
+        # pity no error code here
+        client.switch_database(city)
     
-    query="select * FROM appIconClick WHERE appName='selfie' AND city='"+city+"'"
+    query="select * FROM appIconClick WHERE appName='selfie1500' AND city='"+city+"'"
     filename="selfie.json"
     result=client.query(query)
     with open (filename,'w') as f:
@@ -383,7 +389,10 @@ def getSelfieFromFile():
                         updateKioskSelfie(click[5])    
 
 def getSMSRequests():
-    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+    if useoldapi:
+        client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    else:    
+        client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
     if (client == None):
         print ("Error connecting to URL");
         exit;
@@ -424,17 +433,22 @@ def getSMSRequestsFromFile():
                         updateKioskSMS(click[4])        
     
 def connect (currentMonth,customDate=False,forDate=None):
-    #to support new influxdb 1.5
-    client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+    if useoldapi:
+        client=InfluxDBClient(URL,PORT,uname,password,dbname)
+    else:    
+        #to support new influxdb 1.5
+        print ("using new api")
+        client=InfluxDBClient(host=URL, port=PORT, username=uname, password=password, ssl=True, verify_ssl=True)
+    
     if (client == None):
         print ("Error connecting to URL");
         exit;
 
-    global dbs
-    dbs = client.get_list_database()
-
-    # pity no error code here
-    client.switch_database(city)
+    if useoldapi == False:
+        global dbs
+        dbs = client.get_list_database()
+        # pity no error code here
+        client.switch_database(city)
 
     today= int(time.strftime("%m"))
     if int(time.strftime("%d")) > 15:
@@ -475,7 +489,7 @@ def connect (currentMonth,customDate=False,forDate=None):
                 endDay=temp
 
             query="select * from " + click + " where city='"+city+"' and time >= '" +startDay + "' and time < '" + endDay + "'"
-            filename=click+"_daily.json"
+            filename=click+"_"+startDay+"-"+endDay+".json"
         elif currentMonth == True:
             query="select * from " + click + " where city='"+city+"' and time >= '" +startDay + "' and time < '" + endDay + "'"
             filename=click+"_currentMonth.json"
@@ -1071,12 +1085,23 @@ def run(arg):
         formatOutput(currentMonth=True, textOnly=True)
         
             
+    if arg == "adpop":
+        clickBaits=["ageOfAdpost"]
+        loadConfig()
+        connect(currentMonth=True)
+        print ("Just created the adpop json")   
+ 
+    if arg == "adpop2":
+        clickBaits=["ageOfAdpost"]
+        loadConfig()
+        connect(currentMonth=False, customDate=True, forDate=fordate)
+        print ("Just created the adpop json")   
 
     if arg == "uptime":
         clickBaits=["ageOfAdpost","ageOfSmartPost"]
         loadConfig()
         connect(currentMonth=True)
-        formatOutput(currentMonth=True)
+        #formatOutput(currentMonth=True)
 
 
     
@@ -1120,10 +1145,16 @@ if __name__ == '__main__':
                         dest="xlist",
                         action="store")                     
 
+    parser.add_argument("-o",
+                        "--oldClient",
+                        dest="oldclient",
+                        action="store_true")                     
 
                     
     args=parser.parse_args()   
     
+    if args.oldclient:
+        useoldapi=True
     if args.kcomb:
         showAll=True             
     if args.city:
